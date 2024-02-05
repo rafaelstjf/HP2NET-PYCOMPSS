@@ -3,6 +3,7 @@ from pycompss.api.binary import binary
 from pycompss.api.parameter import *
 from bioconfig import BioConfig
 import os, glob, tarfile, logging, tarfile, shutil
+from pycompss.api.julia import julia
 from Bio import AlignIO
 from pathlib import Path
 from appsexception import *
@@ -13,8 +14,8 @@ from appsexception import *
 def raxml(alignment, evo_model, bs_value, out_suffix, seed, working_dir):
     pass
 
-@task(basedir=IN, config=IN, seq_dict = OUT)
-def convert_sequences(basedir: dict, config: BioConfig, seq_dict: dict):
+@task(basedir=IN, config=IN,returns=1)
+def convert_sequences(basedir: dict, config: BioConfig):
     """Extract the sequence alignments tar file and convert the gene alignments from the nexus format to the phylip format.
 
     Parameters:
@@ -86,6 +87,7 @@ def convert_sequences(basedir: dict, config: BioConfig, seq_dict: dict):
                 shutil.copyfile(f, os.path.join(input_phylip_dir, os.path.basename(f)))
     except Exception as e:
         raise AlignmentConversion(input_phylip_dir)
+    seq_dict = dict()
     seq_dict["nexus"] = list()
     seq_dict["fasta"] = list()
     seq_dict["phylip"] = list()
@@ -94,7 +96,6 @@ def convert_sequences(basedir: dict, config: BioConfig, seq_dict: dict):
             seq_dict["nexus"].append(os.path.join(input_nexus_dir, f'{out_name}.nex'))
             seq_dict["fasta"].append(os.path.join(input_fasta_dir, f'{out_name}.fasta'))
             seq_dict["phylip"].append(os.path.join(input_phylip_dir, f'{out_name}.phy'))
-
     return seq_dict
 
 @task(basedir=IN, config=IN, inputs=COLLECTION_INOUT)
@@ -329,18 +330,17 @@ def setup_astral(basedir, config, setup):
     r_dict["astral_output"] = astral_output
     return r_dict
 
-@binary(binary=BioConfig.astral,
+@binary(binary="java -jar /prj/posgrad/rafaelst/Documentos/GitHub/ASTRAL/Astral/astral.5.7.8.jar",
          working_dir='.',
          args=f"-i {{tree_output}} -b {{bs_file}} -r {{bs_value}} -o {{astral_output}}")
 @task()
 def astral(tree_output, bs_file, bs_value, astral_output):
     pass
 
-@binary(binary=f"julia {BioConfig.snaq}",
-        working_dir = '.',
-        args = "{{tree_method}} {{gen_tree}} {{spec_tree}} {{output_folder}} {{num_threads}} {{hmax}} {{runs}}")
-@task()
-def snaq(tree_method, gen_tree, spec_tree, output_folder, num_threads, hmax, runs):
+@julia(script=f"julia /prj/posgrad/rafaelst/Documentos/GitHub/HP2NET-PYCOMPSS/scripts/snaq.jl",
+        working_dir = '.')
+@task(astral=IN)
+def snaq(tree_method, gen_tree, spec_tree, output_folder, num_threads, hmax, runs, astral):
     pass
 
 @task(basedir=IN, config=IN, folders=COLLECTION_IN)

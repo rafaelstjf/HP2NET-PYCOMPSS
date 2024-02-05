@@ -19,8 +19,7 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 
 #from apps import quartet_maxcut
 from genericpath import isfile
-from parsl import bash_app, python_app
-import parsl, os, json, glob
+import json, glob, os
 from appsexception import JsonMissingData, RootMissing, TarMissingData
 
 # COPYRIGHT SECTION
@@ -61,8 +60,6 @@ class BioConfig:
     tree_method:        str
     bootstrap:          str
     workload:           field(default_factory=list)
-    workflow_name:      str
-    workflow_path:      str
     raxml:              str
     raxml_dir:          str
     raxml_output:       str
@@ -177,9 +174,6 @@ class ConfigFactory:
                         raise TarMissingData(dir_['dir'])
                     workload.append(dir_)
         bootstrap = cf['GENERAL']['BootStrap']
-        execution_provider = cf['GENERAL']['ExecutionProvider'].upper()
-        plot_networks = cf["WORKFLOW"].getboolean("Plot")
-
         #RAXML
         raxml = cf['RAXML']['RaxmlExecutable']
         raxml_dir = 'raxml'
@@ -237,8 +231,6 @@ class ConfigFactory:
         quartet_maxcut_exec_dir = cf['QUARTETMAXCUT']['QmcExecDir']
         quartet_maxcut_dir = 'qmc'
         self.bioconfig = BioConfig(script_dir=script_dir,
-                                   execution_provider=execution_provider,
-                                   plot_networks=plot_networks,
                                    network_method=network_method,
                                    tree_method=tree_method,
                                    bootstrap=bootstrap,
