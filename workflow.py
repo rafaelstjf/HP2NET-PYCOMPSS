@@ -24,7 +24,7 @@ def main():
     spec_tree = os.path.join(basedir['dir'], os.path.join(config.astral_dir, config.raxml_dir))
     spec_tree = os.path.join(spec_tree, config.astral_output)
     output_folder = os.path.join(basedir['dir'], config.snaq_dir)
-    r_snaq = apps.snaq(basedir["tree_method"], besttree_file, spec_tree, "10", config.snaq_hmax, config.snaq_runs)
+    r_snaq = apps.snaq(basedir["tree_method"], besttree_file, spec_tree, output_folder, "10", config.snaq_hmax, config.snaq_runs)
     compss_wait_on(r_snaq)
 
 
