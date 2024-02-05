@@ -1,20 +1,30 @@
 from pycompss.api.task import task
 from pycompss.api.binary import binary
+<<<<<<< HEAD
 from pycompss.api.parameter import *
 from bioconfig import BioConfig
 import os, glob, tarfile, logging, tarfile, shutil
 from Bio import AlignIO
 from pathlib import Path
 from appsexception import *
+=======
+from pycompss.api.parameter import DIRECTORY_INOUT
+
+>>>>>>> 21a5cb69ff9d3e967d9c517f6ce4e46644a2498d
 @binary(binary="raxmlHPC",
         working_dir=".",
-        args= "-s {{alignment}} -m {{evo_model}} -f a -x {{seed}} -p {{seed}} -N {{bs_value}} -n {{out_suffix}}") # decorador para binários externos. O nome do programa deve ser passado como parâmetro
+        args= "-s {{alignment}} -m {{evo_model}} --HKY85 -f a -x {{seed}} -p {{seed}} -N {{bs_value}} -n {{out_suffix}} -w {{working_dir}}") # decorador para binários externos. O nome do programa deve ser passado como parâmetro
 @task() # mesmo com o decorador tem-se que colocar o decorador de task
-def raxml(alignment, evo_model, bs_value, out_suffix, seed):
+def raxml(alignment, evo_model, bs_value, out_suffix, seed, working_dir):
     pass
 
+<<<<<<< HEAD
 @task(basedir=IN, config=IN, seq_dict = OUT)
 def convert_sequences(basedir: dict, config: BioConfig, seq_dict: dict):
+=======
+@task(basedir=DIRECTORY_INOUT)
+def setup_phylip_data(basedir, test):
+>>>>>>> 21a5cb69ff9d3e967d9c517f6ce4e46644a2498d
     """Extract the sequence alignments tar file and convert the gene alignments from the nexus format to the phylip format.
 
     Parameters:
@@ -33,9 +43,16 @@ def convert_sequences(basedir: dict, config: BioConfig, seq_dict: dict):
         Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
         named according to task id and saved under task_logs in the run directory.
     """
+<<<<<<< HEAD
 
     logging.info(f'Converting Nexus files to Phylip on {basedir["dir"]}')
     input_dir = os.path.join(basedir['dir'], 'input')
+=======
+    import os, glob, tarfile, tarfile, shutil
+    from Bio import AlignIO
+    from pathlib import Path
+    input_dir = os.path.join(basedir, 'input')
+>>>>>>> 21a5cb69ff9d3e967d9c517f6ce4e46644a2498d
     sequence_dir = os.path.join(input_dir, 'sequence')
     input_format = 0
     # First the sequences are extracted
@@ -47,7 +64,11 @@ def convert_sequences(basedir: dict, config: BioConfig, seq_dict: dict):
     # Now one file is opened to check its format
     sequences = glob.glob(os.path.join(sequence_dir, '*'))
     if len(sequences) == 0:
+<<<<<<< HEAD
         raise AlignmentConversion(input_phylip_dir)
+=======
+        pass # TODO raise an exception
+>>>>>>> 21a5cb69ff9d3e967d9c517f6ce4e46644a2498d
     with open(sequences[0], 'r') as s_file:
         line = s_file.readline()
         if "#NEXUS" in line:
@@ -74,7 +95,11 @@ def convert_sequences(basedir: dict, config: BioConfig, seq_dict: dict):
             out_name = os.path.basename(f).split('.')[0]
             if input_format == 0:
                 AlignIO.convert(f, "nexus", os.path.join(input_phylip_dir, f'{out_name}.phy'), "phylip-sequential", molecule_type = "DNA")
+<<<<<<< HEAD
                 AlignIO.convert(f, "nexus", os.path.join(input_fasta_dir, f'{out_name}.fasta'), "fasta", molecule_type = "DNA")
+=======
+                AlignIO.convert(f, "nexus", os.path.join(input_phylip_dir, f'{out_name}.fasta'), "fasta", molecule_type = "DNA")
+>>>>>>> 21a5cb69ff9d3e967d9c517f6ce4e46644a2498d
                 shutil.copyfile(f, os.path.join(input_nexus_dir, os.path.basename(f)))
             if input_format == 1:
                 AlignIO.convert(f, "fasta", os.path.join(input_phylip_dir, f'{out_name}.phy'), "phylip-sequential", molecule_type = "DNA")
@@ -85,6 +110,7 @@ def convert_sequences(basedir: dict, config: BioConfig, seq_dict: dict):
                 AlignIO.convert(f, "phylip-sequential", os.path.join(input_fasta_dir, f'{out_name}.fasta'), "fasta", molecule_type = "DNA")
                 shutil.copyfile(f, os.path.join(input_phylip_dir, os.path.basename(f)))
     except Exception as e:
+<<<<<<< HEAD
         raise AlignmentConversion(input_phylip_dir)
     seq_dict["nexus"] = list()
     seq_dict["fasta"] = list()
@@ -364,3 +390,8 @@ def create_folders(basedir: dict,
         except Exception:
             FolderCreationError(full_path)
     return
+=======
+       pass # TODO raise an exception
+    return
+
+>>>>>>> 21a5cb69ff9d3e967d9c517f6ce4e46644a2498d
