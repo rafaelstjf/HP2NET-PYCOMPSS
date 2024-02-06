@@ -330,15 +330,16 @@ def setup_astral(basedir, config, setup):
     r_dict["astral_output"] = astral_output
     return r_dict
 
-@binary(binary="java -jar /prj/posgrad/rafaelst/Documentos/GitHub/ASTRAL/Astral/astral.5.7.8.jar",
+@binary(binary="java",
          working_dir='.',
-         args=f"-i {{tree_output}} -b {{bs_file}} -r {{bs_value}} -o {{astral_output}}")
+         args="-jar /prj/posgrad/rafaelst/Documentos/GitHub/ASTRAL/Astral/astral.5.7.8.jar -i {{tree_output}} -b {{bs_file}} -r {{bs_value}} -o {{astral_output}}")
 @task()
 def astral(tree_output, bs_file, bs_value, astral_output):
     pass
 
-@julia(script=f"julia /prj/posgrad/rafaelst/Documentos/GitHub/HP2NET-PYCOMPSS/scripts/snaq.jl",
-        working_dir = '.')
+@binary(binary="julia",
+        working_dir = '.',
+        args="/prj/posgrad/rafaelst/Documentos/GitHub/HP2NET-PYCOMPSS/scripts/snaq.jl {{tree_method}} {{gen_tree}} {{spec_tree}} {{output_folder}} {{num_threads}} {{hmax}} {{runs}}")
 @task(astral=IN)
 def snaq(tree_method, gen_tree, spec_tree, output_folder, num_threads, hmax, runs, astral):
     pass
