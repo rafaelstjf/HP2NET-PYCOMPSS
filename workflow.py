@@ -32,7 +32,9 @@ def main():
     spec_tree = os.path.join(basedir['dir'], os.path.join(config.astral_dir, config.raxml_dir))
     spec_tree = os.path.join(spec_tree, config.astral_output)
     output_folder = os.path.join(basedir['dir'], config.snaq_dir)
-    apps.snaq(tree_method = basedir["tree_method"], gen_tree = besttree_file, spec_tree = spec_tree, output_folder = output_folder, num_threads = 1, hmax = config.snaq_hmax, runs = config.snaq_runs, astral = r_astral)
+    for h in config.snaq_hmax:
+        print(h)
+        apps.snaq(tree_method = basedir["tree_method"], gen_tree = besttree_file, spec_tree = spec_tree, output_folder = output_folder, num_threads = 1, hmax = h, runs = config.snaq_runs, astral = r_astral)
 
 if __name__ == "__main__":
     main()
