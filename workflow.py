@@ -4,12 +4,11 @@ import os
 import bioconfig
 
 
-def main():
+def raxml_snaq():
     config_file = 'default.ini'
     cf = bioconfig.ConfigFactory(config_file)
     config = cf.build_config()
     basedir = (config.workload)[0]
-    """
     folder_list = [config.raxml_dir, config.astral_dir, config.snaq_dir]
     r = apps.create_folders(basedir, config, folder_list)
     compss_wait_on(r)
@@ -23,7 +22,6 @@ def main():
                        bs_value=config.bootstrap, out_suffix=suffix, seed='123', working_dir=os.path.join(basedir["dir"], config.raxml_dir)))
     r_sad = apps.setup_tree_output(basedir, config, r_raxml)
     r_pastral = apps.setup_astral(basedir, config, r_sad)
-    """
     r_pastral = apps.setup_astral(basedir, config, [])
     r_pastral = compss_wait_on(r_pastral)
     r_astral = apps.astral(tree_output = r_pastral["tree_output"], bs_file = r_pastral["bs_file"], bs_value = config.bootstrap, astral_output = r_pastral["astral_output"])
@@ -32,9 +30,10 @@ def main():
     spec_tree = os.path.join(basedir['dir'], os.path.join(config.astral_dir, config.raxml_dir))
     spec_tree = os.path.join(spec_tree, config.astral_output)
     output_folder = os.path.join(basedir['dir'], config.snaq_dir)
+    r_snaq = list()
     for h in config.snaq_hmax:
         print(h)
-        apps.snaq(tree_method = basedir["tree_method"], gen_tree = besttree_file, spec_tree = spec_tree, output_folder = output_folder, num_threads = 1, hmax = h, runs = config.snaq_runs, astral = r_astral)
-
+        r_snaq.append(apps.snaq(tree_method = basedir["tree_method"], gen_tree = besttree_file, spec_tree = spec_tree, output_folder = output_folder, num_threads = 1, hmax = h, runs = config.snaq_runs, astral = r_astral))
+    compss_wait_on(r_snaq)
 if __name__ == "__main__":
-    main()
+    raxml_snaq()
