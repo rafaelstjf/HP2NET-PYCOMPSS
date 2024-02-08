@@ -202,7 +202,7 @@ class ConfigFactory:
         for h in snaq_hmax_raw.split(','):
             snaq_hmax.append(h.strip())
         snaq_runs = int(cf['SNAQ']['SnaqRuns'])
-        snaq_dir = 'snaq'
+        snaq_dir = cf['SNAQ']['SnaqDir']
         
         #PHYLONET
         phylonet_exec_dir = cf['PHYLONET']['PhyloNetExecDir']

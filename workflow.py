@@ -25,7 +25,8 @@ def raxml_snaq():
     r_sad = apps.setup_tree_output(basedir, config, r_raxml)
     r_pastral = apps.setup_astral(basedir, config, r_sad)
     r_pastral = compss_wait_on(r_pastral)
-    r_astral = apps.astral(tree_output=r_pastral["tree_output"], bs_file=r_pastral["bs_file"],
+    r_astral = apps.astral(binary=os.path.join(config.astral_dir, config.astral),
+                           tree_output=r_pastral["tree_output"], bs_file=r_pastral["bs_file"],
                            bs_value=config.bootstrap, astral_output=r_pastral["astral_output"])
     raxml_dir = os.path.join(basedir['dir'], config.raxml_dir)
     besttree_file = os.path.join(raxml_dir, config.raxml_output)
@@ -35,10 +36,11 @@ def raxml_snaq():
     output_folder = os.path.join(basedir['dir'], config.snaq_dir)
     r_snaq = list()
     for h in config.snaq_hmax:
-        r_snaq.append(apps.snaq(tree_method=basedir["tree_method"], 
-                        gen_tree=besttree_file, spec_tree=spec_tree,
-                        output_folder=output_folder, num_threads=1, 
-                        hmax=h, runs=config.snaq_runs, astral=r_astral))
+        r_snaq.append(apps.snaq(script_file=os.path.join(config.snaq_dir, config.snaq),
+                                tree_method=basedir["tree_method"], 
+                                gen_tree=besttree_file, spec_tree=spec_tree,
+                                output_folder=output_folder, num_threads=1, 
+                                hmax=h, runs=config.snaq_runs, astral=r_astral))
     compss_wait_on(r_snaq)
 
 
