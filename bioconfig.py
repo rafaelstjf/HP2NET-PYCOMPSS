@@ -19,7 +19,7 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 
 #from apps import quartet_maxcut
 from genericpath import isfile
-import json, glob, os
+import os, json, glob
 from appsexception import JsonMissingData, RootMissing, TarMissingData
 
 # COPYRIGHT SECTION
@@ -51,15 +51,23 @@ class borg(object):
         return self.my_instance
 
 
-@dataclass
+@dataclass()
 class BioConfig:
     env_path:           str
     environ:            str
     script_dir:         str
+    execution_provider: str
+    plot_networks:      bool
     network_method:     str
     tree_method:        str
     bootstrap:          str
     workload:           field(default_factory=list)
+    workflow_name:      str
+    workflow_path:      str
+    workflow_monitor:   bool
+    workflow_walltime:  str
+    workflow_core:    int
+    workflow_node:    int
     raxml:              str
     raxml_dir:          str
     raxml_output:       str
@@ -100,10 +108,72 @@ class BioConfig:
     phylonet_input:     str
     phylonet_dir:       str
     phylonet_runs:      str
+    plot_script:        str
+
+    def __hash__(self):
+        workload_tuples = [tuple(item.items()) for item in self.workload]
+        return hash((
+            self.env_path,
+            self.environ,
+            self.script_dir,
+            self.execution_provider,
+            self.plot_networks,
+            self.network_method,
+            self.tree_method,
+            self.bootstrap,
+            tuple(workload_tuples),
+            self.workflow_name,
+            self.workflow_path,
+            self.workflow_monitor,
+            self.workflow_walltime,
+            self.workflow_core,
+            self.workflow_node,
+            self.raxml,
+            self.raxml_dir,
+            self.raxml_output,
+            self.raxml_rooted_output,
+            self.raxml_threads,
+            self.raxml_model,
+            self.iqtree,
+            self.iqtree_dir,
+            self.iqtree_model,
+            self.iqtree_threads,
+            self.iqtree_output,
+            self.iqtree_rooted_output,
+            self.astral_exec_dir,
+            self.astral_jar,
+            self.astral,
+            self.astral_dir,
+            self.astral_output,
+            self.snaq,
+            self.snaq_threads,
+            tuple(self.snaq_hmax),
+            self.snaq_runs,
+            self.snaq_dir,
+            self.mrbayes,
+            self.mrbayes_parameters,
+            self.mrbayes_dir,
+            self.bucky,
+            self.bucky_dir,
+            self.mbsum,
+            self.mbsum_dir,
+            self.quartet_maxcut,
+            self.quartet_maxcut_exec_dir,
+            self.quartet_maxcut_dir,
+            self.phylonet,
+            self.phylonet_exec_dir,
+            self.phylonet_jar,
+            self.phylonet_threads,
+            tuple(self.phylonet_hmax),
+            self.phylonet_input,
+            self.phylonet_dir,
+            self.phylonet_runs,
+            self.plot_script,
+        ))
+
 
 @borg
 class ConfigFactory:
-
     def __init__(self, config_file: str = "default.ini", custom_workload: str = None) -> None:
         import configparser
         self.custom_workload = custom_workload
@@ -174,6 +244,21 @@ class ConfigFactory:
                         raise TarMissingData(dir_['dir'])
                     workload.append(dir_)
         bootstrap = cf['GENERAL']['BootStrap']
+        execution_provider = cf['GENERAL']['ExecutionProvider'].upper()
+        plot_networks = cf["WORKFLOW"].getboolean("Plot")
+
+        #SYSTEM
+        #WORKFLOW
+        workflow_name = "HP2NET"
+        workflow_monitor = cf["WORKFLOW"].getboolean("Monitor")
+        if execution_provider == "SLURM":
+            workflow_walltime = cf["WORKFLOW"]["Walltime"]
+            workflow_core = int(cf["WORKFLOW"]["PartCore"]) #hardcoded to ensure a free core to parsl 
+            workflow_node = int(cf["WORKFLOW"]["PartNode"])
+        else:
+            workflow_walltime = None
+            workflow_core = int(cf["WORKFLOW"]["MaxCore"]) #hardcoded to ensure a free core to parsl 
+            workflow_node = int(cf["WORKFLOW"]["CoresPerWorker"])
         #RAXML
         raxml = cf['RAXML']['RaxmlExecutable']
         raxml_dir = 'raxml'
@@ -191,7 +276,7 @@ class ConfigFactory:
         #ASTRAL
         astral_exec_dir = cf['ASTRAL']['AstralExecDir']
         astral_jar = cf['ASTRAL']['AstralJar']
-        astral = f"cd {astral_exec_dir}; java -jar {astral_jar}"
+        astral = f"java -jar {os.path.join(astral_exec_dir, astral_jar)}"
         astral_dir = 'astral'
         astral_output = 'astral.tre'
         #SNAQ
@@ -202,7 +287,7 @@ class ConfigFactory:
         for h in snaq_hmax_raw.split(','):
             snaq_hmax.append(h.strip())
         snaq_runs = int(cf['SNAQ']['SnaqRuns'])
-        snaq_dir = cf['SNAQ']['SnaqDir']
+        snaq_dir = 'snaq'
         
         #PHYLONET
         phylonet_exec_dir = cf['PHYLONET']['PhyloNetExecDir']
@@ -230,13 +315,23 @@ class ConfigFactory:
         quartet_maxcut = cf['QUARTETMAXCUT']['QmcExecutable']
         quartet_maxcut_exec_dir = cf['QUARTETMAXCUT']['QmcExecDir']
         quartet_maxcut_dir = 'qmc'
+        #PLOT SCRIPT
+        plot_script = os.path.join(script_dir, "plot.jl")
         self.bioconfig = BioConfig(script_dir=script_dir,
+                                   execution_provider=execution_provider,
+                                   plot_networks=plot_networks,
                                    network_method=network_method,
                                    tree_method=tree_method,
                                    bootstrap=bootstrap,
                                    workload=workload,
                                    env_path=env_path,
                                    environ=environ,
+                                   workflow_monitor=workflow_monitor,
+                                   workflow_name=workflow_name,
+                                   workflow_path=workflow_path,
+                                   workflow_walltime=workflow_walltime,
+                                   workflow_core=workflow_core,
+                                   workflow_node=workflow_node,
                                    raxml=raxml,
                                    raxml_dir=raxml_dir,
                                    raxml_output=raxml_output,
@@ -277,5 +372,6 @@ class ConfigFactory:
                                    phylonet_input=phylonet_input,
                                    phylonet_dir=phylonet_dir,
                                    phylonet_runs=phylonet_runs,
+                                   plot_script=plot_script
                                    )
         return self.bioconfig

@@ -7,11 +7,11 @@ from pycompss.api.julia import julia
 from Bio import AlignIO
 from pathlib import Path
 from appsexception import *
-@binary(binary="raxmlHPC",
+@binary(binary="raxmlHPC-PTHREADS",
         working_dir=".",
-        args= "-s {{alignment}} -m {{evo_model}} --HKY85 -f a -x {{seed}} -p {{seed}} -N {{bs_value}} -n {{out_suffix}} -w {{working_dir}}") # decorador para binários externos. O nome do programa deve ser passado como parâmetro
+        args= "-s {{alignment}} -m {{evo_model}} -f a -x {{seed}} -p {{seed}} -N {{bs_value}} -n {{out_suffix}} -w {{work_dir}}") # decorador para binários externos. O nome do programa deve ser passado como parâmetro
 @task() # mesmo com o decorador tem-se que colocar o decorador de task
-def raxml(alignment, evo_model, bs_value, out_suffix, seed, working_dir):
+def raxml(alignment, evo_model, bs_value, out_suffix, seed, work_dir):
     pass
 
 @task(basedir=IN, config=IN,returns=1)
@@ -101,7 +101,7 @@ def convert_sequences(basedir: dict, config: BioConfig):
 @task(basedir=IN, config=IN, inputs=COLLECTION_INOUT)
 def setup_tree_output(basedir: dict,
                       config: BioConfig,
-                      inputs: dict
+                      inputs: list
                       ):
     """Create the phylogenetic tree software (raxml, iqtree,...) best tree file and organize the temporary files to subsequent softwares 
 

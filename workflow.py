@@ -20,7 +20,7 @@ def raxml_snaq():
         suffix = os.path.splitext(os.path.basename(g))[0]
         r_raxml.append(apps.raxml(alignment=g, evo_model=config.raxml_model,
                         bs_value=config.bootstrap, out_suffix=suffix, seed='123', 
-                        working_dir=os.path.join(basedir["dir"], 
+                        work_dir=os.path.join(basedir["dir"], 
                         config.raxml_dir)))
     r_sad = apps.setup_tree_output(basedir, config, r_raxml)
     r_pastral = apps.setup_astral(basedir, config, r_sad)
@@ -36,7 +36,7 @@ def raxml_snaq():
     output_folder = os.path.join(basedir['dir'], config.snaq_dir)
     r_snaq = list()
     for h in config.snaq_hmax:
-        r_snaq.append(apps.snaq(script_file=os.path.join(config.snaq_dir, config.snaq),
+        r_snaq.append(apps.snaq(script_file=os.path.join("./scripts", config.snaq),
                                 tree_method=basedir["tree_method"], 
                                 gen_tree=besttree_file, spec_tree=spec_tree,
                                 output_folder=output_folder, num_threads=1, 
