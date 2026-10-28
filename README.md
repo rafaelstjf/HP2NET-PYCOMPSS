@@ -9,12 +9,18 @@ The methodology for reconstructing networks is still in development. Here we exp
 
 In view of the complexity in modeling network experiments, the present work introduces a workflow for phylogenetic network analyses coupled to be executed in High-Performance Computing (HPC) environments. The workflow aims to integrate well-established software, pipelines and scripts, implementing a challenging task since these tools do not consistently profit from the HPC environment, leading to an increase in the expected makespan and idle computing resources.
 
+HP2NET supports two workflow runtimes: the original **Parsl** backend and a
+**PyCOMPSs** backend. Both use the same workflow implementation, settings file,
+workload file and scientific applications. Select the backend through its entry
+point: `parsl_workflow.py` for Parsl or `pycompss_workflow.py` for PyCOMPSs.
+
 ## Requirements
 
 1. Python >= 3.9.6
    1. Biopython >= 1.75
    2. Pandas >= 1.3.2
-   3. Parsl >= 1.0
+   3. Parsl >= 1.0 (for the Parsl backend)
+   4. PyCOMPSs >= 3.3.3 (for the PyCOMPSs backend)
 3. Raxml >= 8.2.12
 4. Astral  >= 5.7.1
 5. SnaQ (PhyloNetworks) <= 0.16.4
@@ -32,7 +38,11 @@ In view of the complexity in modeling network experiments, the present work intr
 
 The framework uses a file to get all the needed parameters. For default it loads the file *default.ini* in the config folder, but you can explicitly load other files using the argument ``-s name_of_the_file``, *e.g.* ``-s config/test.ini``.
 
-* Edit *parl.env* with the environment variables you may need, such as modules loadeds in SLURM
+* For Parsl, edit *config/parsl.env* with the environment variables and modules
+  required by the Slurm workers.
+* For PyCOMPSs on Sequana, load *config/pycompss.env* in the current terminal
+  with ``source config/pycompss.env`` before calling ``runcompss`` or
+  ``enqueue_compss``.
 * Edit *work.config* with the directories of your phylogeny studies (the framework receives as input a set of homologous gene alignments of species in the nexus format).
 * Edit *default.ini* with the path for each of the needed softwares and the parameters of the execution provider.
 
@@ -126,10 +136,18 @@ BootStrap       = 1000
 
   ```ini
   [SNAQ]
+	JuliaExecutable = /path/to/julia/bin/julia
+	JuliaProject     = /shared/path/to/HP2NET/julia_env
+	JuliaDepot       = /shared/path/to/HP2NET/julia_depot
   SnaqThreads		= 6
   SnaqHMax        = 3
   SnaqRuns        = 3
   ```
+
+  `JuliaExecutable`, `JuliaProject`, and `JuliaDepot` are applied directly to
+  SNaQ and plotting commands. For PyCOMPSs, the project and depot must be on a
+  filesystem shared by the master and all workers. This avoids relying on the
+  Parsl-specific `worker_init` environment.
 
 * Mr. Bayes settings
 
@@ -207,6 +225,47 @@ Where ``Mapping`` is a direct mapping of the taxon, when there are multiple alle
 
 
 ## Running the framework
+
+### Running with PyCOMPSs
+
+The Parsl entry point is kept for compatibility. The PyCOMPSs entry point uses
+the same configuration and workload files:
+
+```sh
+source config/pycompss.env
+runcompss --pythonpath="$PWD" pycompss_workflow.py \
+    --settings default.ini --workload work.config
+```
+
+Generate the PyCOMPSs dependency graph with `runcompss -g`. The experiment
+directories must be visible from all workers (for example, through a shared
+filesystem), because the coupled phylogenetic programs exchange their results
+through those directories.
+
+On a Slurm installation supported by COMPSs, adapt and submit
+`submit_pycompss.sh`. The original `submit.sh` continues to launch Parsl.
+
+Install the Python-side dependencies from `requirements-pycompss.txt`. The
+external scientific programs listed above are still required on every worker.
+Load their modules before invoking `runcompss`/`enqueue_compss`; the old
+`parsl.env` worker initialization is specific to Parsl and is not evaluated by
+the PyCOMPSs entry point.
+
+#### Reusing tree-estimation tasks
+
+Within one workflow submission, branches for the same dataset and tree method
+share their preparation and tree-estimation tasks. For example:
+
+```text
+/data/D1@RAXML|MP
+/data/D1@RAXML|MPL
+```
+
+The input is prepared once and RAxML is executed once per alignment. Its tree
+output is then consumed by both branches: PhyloNet (`MP`) and ASTRAL/SNaQ
+(`MPL`). The same reuse applies to `IQTREE|MP` plus `IQTREE|MPL`. This is reuse
+inside the current Parsl or PyCOMPSs execution; it is not a persistent cache
+between separate submissions.
 
 * In a local machine:
 

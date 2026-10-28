@@ -19,8 +19,7 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 
 #from apps import quartet_maxcut
 from genericpath import isfile
-from parsl import bash_app, python_app
-import parsl, os, json, glob
+import os, json, glob
 from appsexception import JsonMissingData, RootMissing, TarMissingData
 
 # COPYRIGHT SECTION
@@ -87,6 +86,9 @@ class BioConfig:
     astral_dir:         str
     astral_output:      str
     snaq:               str
+    julia_executable:   str
+    julia_project:      str
+    julia_depot:        str
     snaq_threads:       int
     snaq_hmax:          field(default_factory=list)
     snaq_runs:          int
@@ -147,6 +149,9 @@ class BioConfig:
             self.astral_dir,
             self.astral_output,
             self.snaq,
+            self.julia_executable,
+            self.julia_project,
+            self.julia_depot,
             self.snaq_threads,
             tuple(self.snaq_hmax),
             self.snaq_runs,
@@ -246,7 +251,9 @@ class ConfigFactory:
                     workload.append(dir_)
         bootstrap = cf['GENERAL']['BootStrap']
         execution_provider = cf['GENERAL']['ExecutionProvider'].upper()
-        plot_networks = cf["WORKFLOW"].getboolean("Plot")
+        plot_networks = cf["WORKFLOW"].getboolean(
+            "Plot", fallback=cf["GENERAL"].getboolean("Plot", fallback=False)
+        )
 
         #SYSTEM
         #WORKFLOW
@@ -282,6 +289,9 @@ class ConfigFactory:
         astral_output = 'astral.tre'
         #SNAQ
         snaq = 'snaq.jl'
+        julia_executable = cf['SNAQ'].get('JuliaExecutable', fallback='julia').strip() or 'julia'
+        julia_project = cf['SNAQ'].get('JuliaProject', fallback='').strip()
+        julia_depot = cf['SNAQ'].get('JuliaDepot', fallback='').strip()
         snaq_threads = int(cf['SNAQ']['SnaqThreads'])
         snaq_hmax_raw = cf['SNAQ']['SnaqHMax']
         snaq_hmax = list()
@@ -351,6 +361,9 @@ class ConfigFactory:
                                    astral_dir=astral_dir,
                                    astral_output=astral_output,
                                    snaq=snaq,
+                                   julia_executable=julia_executable,
+                                   julia_project=julia_project,
+                                   julia_depot=julia_depot,
                                    snaq_threads=snaq_threads,
                                    snaq_hmax=snaq_hmax,
                                    snaq_runs=snaq_runs,

@@ -1,4 +1,6 @@
 import functools
+import os
+import sys
 from typing import Any
 import logging
 
@@ -48,6 +50,14 @@ def app_reuse(cache, args_to_ignore):
     def decorator(func):
         @functools.wraps(func)
         def wrapper_decorator(*args, **kwargs):
+            # This cache stores Parsl futures.  Wrapping a PyCOMPSs task with
+            # it is both unnecessary and unsafe because PyCOMPSs adds runtime
+            # objects to task invocations that are not hashable/iterable.
+            if (
+                os.environ.get("HP2NET_RUNTIME", "parsl").lower() == "pycompss"
+                or "pycompss" in sys.modules
+            ):
+                return func(*args, **kwargs)
             filtered_kwargs = dict()
             for kwarg in kwargs.keys():
                 if kwarg not in args_to_ignore:

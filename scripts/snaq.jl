@@ -38,25 +38,15 @@ println("Number of runs: $runs")
 if outgroup !== nothing
     println("Species mapping: $outgroup")
 end
-import Pkg
-
-# Ensure required packages are installed
-function ensure_installed(pkgs)
-    for pkg in pkgs
-        if Base.find_package(pkg) === nothing
-            println("Installing $pkg...")
-            Pkg.add(pkg)
-        end
-    end
-end
-
-required_pkgs = ["PhyloNetworks", "Distributed", "CSV"]
-ensure_installed(required_pkgs)
-
-# Import packages
 using PhyloNetworks
 using Distributed
 using CSV
+
+# HP2NET uses the pre-1.0 SNaQ API (including readTrees2CF). Packages must be
+# provisioned before task execution in the shared Julia project/depot.
+if !isdefined(PhyloNetworks, :readTrees2CF)
+    error("HP2NET requires a PhyloNetworks version that provides readTrees2CF (recommended: 0.16.4). Configure JuliaProject and JuliaDepot in default.ini.")
+end
 
 if num_workers > 0
     addprocs(num_workers)

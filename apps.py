@@ -29,9 +29,24 @@ __status__ = "Research"
 
 
 #
-# Parsl Bash and Python Applications
+# Parsl or PyCOMPSs Bash and Python Applications
 #
-import parsl
+
+import os
+import sys
+
+
+if (
+    os.environ.get("HP2NET_RUNTIME", "parsl").lower() == "pycompss"
+    or "pycompss" in sys.modules
+):
+    from pycompss_runtime import AUTO_LOGNAME, bash_task, python_task
+else:
+    import parsl
+
+    AUTO_LOGNAME = parsl.AUTO_LOGNAME
+    bash_task = parsl.bash_app
+    python_task = parsl.python_app
 from appsexception import FileCreationError, FolderDeletionError
 from bioconfig import BioConfig
 from typing import Any
@@ -39,10 +54,10 @@ from utils import app_reuse, Cache
 
 
 # setup_phylip_data bash app
-@parsl.python_app(executors=['single_partition'])
+@python_task(executors=['single_partition'])
 def setup_phylip_data(basedir: dict, config: BioConfig,
-                      stderr=parsl.AUTO_LOGNAME,
-                      stdout=parsl.AUTO_LOGNAME):
+                      stderr=AUTO_LOGNAME,
+                      stdout=AUTO_LOGNAME):
     """Extract the sequence alignments tar file and convert the gene alignments from the nexus format to the phylip format.
 
     Parameters:
@@ -58,7 +73,7 @@ def setup_phylip_data(basedir: dict, config: BioConfig,
 
     TODO: Provide provenance.
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import os, glob, tarfile, logging, tarfile, shutil, re
@@ -123,14 +138,14 @@ def setup_phylip_data(basedir: dict, config: BioConfig,
 
 # raxml bash app
 @app_reuse(cache=Cache(), args_to_ignore=["basedir", "config", "stderr", "stdout", "next_pipe"])
-@parsl.bash_app(executors=['single_partition'])
-def raxml(basedir: dict, 
+@bash_task(executors=['single_partition'])
+def raxml(basedir: dict,
           config: BioConfig,
           input_file: str,
           inputs=[],
           next_pipe: Any = None,
-          stderr=parsl.AUTO_LOGNAME,
-          stdout=parsl.AUTO_LOGNAME,
+          stderr=AUTO_LOGNAME,
+          stdout=AUTO_LOGNAME,
           seed = None):
     """Runs the Raxml's executable on a sequence alignment in phylip format
     Parameters:
@@ -142,7 +157,7 @@ def raxml(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import os, random, logging
@@ -166,25 +181,25 @@ def raxml(basedir: dict,
 
 
 @app_reuse(cache=Cache(), args_to_ignore=["basedir", "config", "stderr", "stdout"])
-@parsl.python_app(executors=['single_partition'])
+@python_task(executors=['single_partition'])
 def setup_tree_output(basedir: dict,
                       config: BioConfig,
                       inputs=[],
                       outputs=[],
-                      stderr=parsl.AUTO_LOGNAME,
-                      stdout=parsl.AUTO_LOGNAME):
-    """Create the phylogenetic tree software (raxml, iqtree,...) best tree file and organize the temporary files to subsequent softwares 
+                      stderr=AUTO_LOGNAME,
+                      stdout=AUTO_LOGNAME):
+    """Create the phylogenetic tree software (raxml, iqtree,...) best tree file and organize the temporary files to subsequent softwares
 
     Parameters:
         basedir: current working directory
     Returns:
         returns an parsl's AppFuture
 
-    TODO: 
+    TODO:
         Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import os, glob, tarfile, logging
@@ -351,22 +366,22 @@ def setup_tree_output(basedir: dict,
     return
 
 @app_reuse(cache=Cache(), args_to_ignore=["basedir", "config", "stderr", "stdout"])
-@parsl.python_app(executors=['single_partition'])
+@python_task(executors=['single_partition'])
 def root_tree(basedir: dict,
               config: BioConfig,
               inputs=[],
               outputs=[],
-              stderr=parsl.AUTO_LOGNAME,
-              stdout=parsl.AUTO_LOGNAME):
-    """Opens the best tree file from raxml or iqtree and root all the trees according to an outgroup 
+              stderr=AUTO_LOGNAME,
+              stdout=AUTO_LOGNAME):
+    """Opens the best tree file from raxml or iqtree and root all the trees according to an outgroup
 
     Parameters:
         basedir: current working directory
-    TODO: 
+    TODO:
         Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     from Bio import Phylo
@@ -384,8 +399,8 @@ def root_tree(basedir: dict,
                 tree.root_with_outgroup(outgroup)
                 buffer+=tree.format("newick")
             with open(os.path.join(tree_dir, config.raxml_rooted_output), 'w') as out:
-                out.write(buffer)  
-                out.close() 
+                out.write(buffer)
+                out.close()
         except:
             pass
     if tree_method == "IQTREE":
@@ -397,19 +412,19 @@ def root_tree(basedir: dict,
                 tree.root_with_outgroup(outgroup)
                 buffer+=tree.format("newick")
             with open(os.path.join(tree_dir, config.iqtree_rooted_output), 'w') as out:
-                out.write(buffer)    
+                out.write(buffer)
                 out.close()
         except:
             pass
     return
-        
-@parsl.bash_app(executors=['single_partition'])
+
+@bash_task(executors=['single_partition'])
 def astral(basedir: dict,
            config: BioConfig,
            inputs=[],
            outputs=[],
-           stderr=parsl.AUTO_LOGNAME,
-           stdout=parsl.AUTO_LOGNAME,
+           stderr=AUTO_LOGNAME,
+           stdout=AUTO_LOGNAME,
            seed = None):
     """Runs the Astral's executable using the besttree file and create the species tree in the astral folder
 
@@ -421,7 +436,7 @@ def astral(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import glob, os, logging
@@ -475,15 +490,15 @@ def astral(basedir: dict,
     else:
         return f'{exec_astral} -i {tree_output} -b {bs_file} -r {config.bootstrap} -o {astral_output}'
 
-@parsl.bash_app(executors=['single_partition'])
+@bash_task(executors=['single_partition'])
 def snaq(basedir: dict,
         config: BioConfig,
         hmax: str,
         inputs=[],
         outputs=[],
         next_pipe: Any = None,
-        stderr=parsl.AUTO_LOGNAME,
-        stdout=parsl.AUTO_LOGNAME,
+        stderr=AUTO_LOGNAME,
+        stdout=AUTO_LOGNAME,
         seed = None):
     """Runs the phylonetwork algorithm (snaq) and create the phylogenetic network in newick format
 
@@ -495,11 +510,11 @@ def snaq(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     # set environment variables
-    import os, logging
+    import os, logging, shlex
     from pathlib import Path
     work_dir = basedir['dir']
     tree_method = basedir['tree_method']
@@ -508,6 +523,14 @@ def snaq(basedir: dict,
     logging.info(f'SNAQ called with {work_dir}')
     # run the julia script with PhyloNetworks
     snaq_exec = os.path.join(config.script_dir, config.snaq)
+    julia_command = shlex.quote(config.julia_executable)
+    if config.julia_project:
+        julia_command += f' --project={shlex.quote(config.julia_project)}'
+    if config.julia_depot:
+        julia_command = (
+            f'env JULIA_DEPOT_PATH={shlex.quote(config.julia_depot)} '
+            f'{julia_command}'
+        )
     num_threads = config.snaq_threads
     output_folder = os.path.join(work_dir, config.snaq_dir)
     runs = config.snaq_runs
@@ -516,34 +539,34 @@ def snaq(basedir: dict,
         astral_tree = os.path.join(work_dir, os.path.join(config.astral_dir, config.raxml_dir))
         astral_tree = os.path.join(astral_tree, config.astral_output)
         if len(mapping) > 0:
-            return f'julia {snaq_exec} {tree_method} {raxml_tree} {astral_tree} {output_folder} {num_threads} {hmax} {runs} \'{mapping}\''
+            return f'{julia_command} {snaq_exec} {tree_method} {raxml_tree} {astral_tree} {output_folder} {num_threads} {hmax} {runs} \'{mapping}\''
         else:
-            return f'julia {snaq_exec} {tree_method} {raxml_tree} {astral_tree} {output_folder} {num_threads} {hmax} {runs}'
+            return f'{julia_command} {snaq_exec} {tree_method} {raxml_tree} {astral_tree} {output_folder} {num_threads} {hmax} {runs}'
     elif tree_method == "IQTREE":
         iqtree_tree = os.path.join(os.path.join(work_dir, config.iqtree_dir), config.iqtree_output)
         astral_tree = os.path.join(work_dir, os.path.join(config.astral_dir,config.iqtree_dir))
         astral_tree = os.path.join(astral_tree, config.astral_output)
         if len(mapping) > 0:
-            return f'julia {snaq_exec} {tree_method} {iqtree_tree} {astral_tree} {output_folder} {num_threads} {hmax} {runs} \'{mapping}\''
+            return f'{julia_command} {snaq_exec} {tree_method} {iqtree_tree} {astral_tree} {output_folder} {num_threads} {hmax} {runs} \'{mapping}\''
         else:
-            return f'julia {snaq_exec} {tree_method} {iqtree_tree} {astral_tree} {output_folder} {num_threads} {hmax} {runs}'
+            return f'{julia_command} {snaq_exec} {tree_method} {iqtree_tree} {astral_tree} {output_folder} {num_threads} {hmax} {runs}'
     elif tree_method == "MRBAYES":
         dir_name = os.path.basename(work_dir)
         qmc_output = os.path.join(os.path.join(work_dir, config.quartet_maxcut_dir), f'{dir_name}.tre')
         bucky_folder = os.path.join(work_dir, config.bucky_dir)
         bucky_table = os.path.join(bucky_folder, f"{dir_name}.csv")
         #mrbayes flow doesn't support mapping
-        return f'julia {snaq_exec} {tree_method} {bucky_table} {qmc_output} {output_folder} {num_threads} {hmax} {runs}'
+        return f'{julia_command} {snaq_exec} {tree_method} {bucky_table} {qmc_output} {output_folder} {num_threads} {hmax} {runs}'
     else:
         return
 
-@parsl.python_app(executors=['single_partition'])
+@python_task(executors=['single_partition'])
 def prepare_prunetrees(basedir: dict,
                        config: BioConfig,
                        input_file: str,
                        inputs=[],
-                       stderr=parsl.AUTO_LOGNAME,
-                       stdout=parsl.AUTO_LOGNAME):
+                       stderr=AUTO_LOGNAME,
+                       stdout=AUTO_LOGNAME):
     import os, glob
     bucky_folder = os.path.join(basedir['dir'], "bucky")
     prune_trees = glob.glob(os.path.join(bucky_folder, "*.txt"))
@@ -552,13 +575,13 @@ def prepare_prunetrees(basedir: dict,
 # Mr.Bayes bash app
 
 
-@parsl.bash_app(executors=['single_partition'])
+@bash_task(executors=['single_partition'])
 def mrbayes(basedir: dict,
             config: BioConfig,
             input_file: str,
             inputs=[],
-            stderr=parsl.AUTO_LOGNAME,
-            stdout=parsl.AUTO_LOGNAME,
+            stderr=AUTO_LOGNAME,
+            stdout=AUTO_LOGNAME,
             seed = None):
     """Runs the Mr. Bayes' executable on a sequence alignment file
 
@@ -570,10 +593,10 @@ def mrbayes(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
-    import os, logging
+    import os, logging, shlex
     from pathlib import Path
     work_dir = basedir['dir']
     logging.info(f'MrBayes called with {work_dir}')
@@ -589,18 +612,24 @@ def mrbayes(basedir: dict,
     if seed is not None:
         par = f"begin mrbayes;\nset nowarnings=yes;\nset autoclose=yes;\nlset nst=2;\n{config.mrbayes_parameters};\nSeed={seed};\nmcmc;\nsumt;\nend;"
     gene_par.write(par)
-    return f"{config.mrbayes} {os.path.join(mb_folder, gene_name)}"
+    gene_par.close()
+    # MrBayes 3.2.7 rejects file names longer than 99 characters. Execute in
+    # its output directory and pass only the short basename.
+    return (
+        f"cd {shlex.quote(mb_folder)} && "
+        f"{shlex.quote(config.mrbayes)} {shlex.quote(gene_name)}"
+    )
 
 # mbsum bash app
 
 
-@parsl.bash_app(executors=['single_partition'])
+@bash_task(executors=['single_partition'])
 def mbsum(basedir: dict,
           config: BioConfig,
           input_file: str,
           inputs=[],
-          stderr=parsl.AUTO_LOGNAME,
-          stdout=parsl.AUTO_LOGNAME,
+          stderr=AUTO_LOGNAME,
+          stdout=AUTO_LOGNAME,
           seed = None):
     """Runs the mbsum's executable on the Mr.Bayes output for a certain sequence alignment
 
@@ -613,7 +642,7 @@ def mbsum(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import os, re, glob, logging
@@ -639,12 +668,12 @@ def mbsum(basedir: dict,
     return f"{config.mbsum} {params}"
 
 
-@parsl.python_app(executors=['single_partition'])
+@python_task(executors=['single_partition'])
 def setup_bucky_data(basedir: dict,
                      config: BioConfig,
                      inputs=[],
-                     stderr=parsl.AUTO_LOGNAME,
-                     stdout=parsl.AUTO_LOGNAME):
+                     stderr=AUTO_LOGNAME,
+                     stdout=AUTO_LOGNAME):
     """Prepares bucky's input, creating a prune tree for each selected quartet
 
     Parameters:
@@ -655,7 +684,7 @@ def setup_bucky_data(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import re, os, glob, logging
@@ -710,14 +739,14 @@ def setup_bucky_data(basedir: dict,
     return
 
 
-@parsl.bash_app(executors=['single_partition'])
+@bash_task(executors=['single_partition'])
 def bucky(basedir: dict,
           config: BioConfig,
           prune_file: str,
           inputs=[],
           outputs=[],
-          stderr=parsl.AUTO_LOGNAME,
-          stdout=parsl.AUTO_LOGNAME,
+          stderr=AUTO_LOGNAME,
+          stdout=AUTO_LOGNAME,
           seed = None):
     """Runs bucky's executable using as input a certain prune tree file
 
@@ -730,7 +759,7 @@ def bucky(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import os, glob, re, logging
@@ -749,13 +778,13 @@ def bucky(basedir: dict,
     return f"{config.bucky} {params}"
 
 
-@parsl.python_app(executors=['single_partition'])
+@python_task(executors=['single_partition'])
 def setup_bucky_output(basedir: dict,
                        config: BioConfig,
                        inputs=[],
                        outputs=[],
-                       stderr=parsl.AUTO_LOGNAME,
-                       stdout=parsl.AUTO_LOGNAME):
+                       stderr=AUTO_LOGNAME,
+                       stdout=AUTO_LOGNAME):
     """Create the Concordance Factor table using bucky's outputs
 
     Parameters:
@@ -766,7 +795,7 @@ def setup_bucky_output(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import re, os, glob, logging
@@ -842,13 +871,13 @@ def setup_bucky_output(basedir: dict,
     return
 
 
-@parsl.python_app(executors=['single_partition'])
+@python_task(executors=['single_partition'])
 def setup_qmc_data(basedir: dict,
                    config: BioConfig,
                    inputs=[],
                    outputs=[],
-                   stderr=parsl.AUTO_LOGNAME,
-                   stdout=parsl.AUTO_LOGNAME):
+                   stderr=AUTO_LOGNAME,
+                   stdout=AUTO_LOGNAME):
     """Prepares the Quartet MaxCut input
 
     Parameters:
@@ -858,7 +887,7 @@ def setup_qmc_data(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import pandas as pd
@@ -924,13 +953,13 @@ def setup_qmc_data(basedir: dict,
     return
 
 
-@parsl.bash_app(executors=['single_partition'])
+@bash_task(executors=['single_partition'])
 def quartet_maxcut(basedir: dict,
                    config: BioConfig,
                    inputs=[],
                    outputs=[],
-                   stderr=parsl.AUTO_LOGNAME,
-                   stdout=parsl.AUTO_LOGNAME):
+                   stderr=AUTO_LOGNAME,
+                   stdout=AUTO_LOGNAME):
     """Runs quartet maxcut's executable
     Parameters:
         basedir: current working directory
@@ -940,7 +969,7 @@ def quartet_maxcut(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import os, logging
@@ -955,13 +984,13 @@ def quartet_maxcut(basedir: dict,
     return f'{exec_qmc} qrtt={qmc_input} otre={qmc_output}'
 
 
-@parsl.python_app(executors=['single_partition'])
+@python_task(executors=['single_partition'])
 def setup_qmc_output(basedir: dict,
                      config: BioConfig,
                      inputs=[],
                      outputs=[],
-                     stderr=parsl.AUTO_LOGNAME,
-                     stdout=parsl.AUTO_LOGNAME):
+                     stderr=AUTO_LOGNAME,
+                     stdout=AUTO_LOGNAME):
     """Prepare quartet maxcut's output file
 
     Parameters:
@@ -972,7 +1001,7 @@ def setup_qmc_output(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import os, json, logging
@@ -1006,14 +1035,14 @@ def setup_qmc_output(basedir: dict,
     return
 
 
-@parsl.python_app(executors=['single_partition'])
+@python_task(executors=['single_partition'])
 def setup_phylonet_data(basedir: dict,
                         config: BioConfig,
                         hmax: str,
                         inputs=[],
                         outputs=[],
-                        stderr=parsl.AUTO_LOGNAME,
-                        stdout=parsl.AUTO_LOGNAME):
+                        stderr=AUTO_LOGNAME,
+                        stdout=AUTO_LOGNAME):
     """Get the raxml/iqtree's output and create a NEXUS file as output for the phylonet in the basedir
 
     Parameters:
@@ -1024,7 +1053,7 @@ def setup_phylonet_data(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import os, logging, re
@@ -1044,7 +1073,7 @@ def setup_phylonet_data(basedir: dict,
         in_file = open(gene_trees, 'r')
     except IOError:
         print("Error! Could not open Gene tree file.")
-        return 
+        return
     try:
         out_file = open(out_filepath, 'w+')
     except IOError:
@@ -1073,15 +1102,15 @@ def setup_phylonet_data(basedir: dict,
     return
 
 
-@parsl.bash_app(executors=['single_partition'])
+@bash_task(executors=['single_partition'])
 def phylonet(basedir: dict,
             config: BioConfig,
             input_file: str,
             inputs=[],
             outputs=[],
             next_pipe: Any = None,
-            stderr=parsl.AUTO_LOGNAME,
-            stdout=parsl.AUTO_LOGNAME):
+            stderr=AUTO_LOGNAME,
+            stdout=AUTO_LOGNAME):
     """Runs PhyloNet using as input the phylonet_input variable
 
     Parameters:
@@ -1092,7 +1121,7 @@ def phylonet(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     work_dir = basedir['dir']
@@ -1105,14 +1134,14 @@ def phylonet(basedir: dict,
     return f'cd {output_dir};{exec_phylonet} {input_file}'
 
 @app_reuse(cache=Cache(), args_to_ignore=["basedir", "config", "stderr", "stdout", "next_pipe"])
-@parsl.bash_app(executors=['single_partition'])
+@bash_task(executors=['single_partition'])
 def iqtree(basedir: dict,
             config: BioConfig,
             input_file: str,
             inputs=[],
             next_pipe: Any = None,
-            stderr=parsl.AUTO_LOGNAME,
-            stdout=parsl.AUTO_LOGNAME,
+            stderr=AUTO_LOGNAME,
+            stdout=AUTO_LOGNAME,
             seed= None):
     """Runs IQ-TREE's executable using as input a sequence alignment in phylip format
 
@@ -1124,7 +1153,7 @@ def iqtree(basedir: dict,
     TODO: Provide provenance.
 
     NB:
-        Stdout and Stderr are defaulted to parsl.AUTO_LOGNAME, so the log will be automatically 
+        Stdout and Stderr are defaulted to AUTO_LOGNAME, so the log will be automatically
         named according to task id and saved under task_logs in the run directory.
     """
     import os, logging
@@ -1140,14 +1169,14 @@ def iqtree(basedir: dict,
     return f"cd {iqtree_dir}; {config.iqtree} {flags}"
 
 
-@parsl.python_app(executors=['single_partition'])
+@python_task(executors=['single_partition'])
 def create_folders(basedir: dict,
                    config: BioConfig,
                    folders=[],
                    inputs=[],
                    outputs=[],
-                   stderr=parsl.AUTO_LOGNAME,
-                   stdout=parsl.AUTO_LOGNAME):
+                   stderr=AUTO_LOGNAME,
+                   stdout=AUTO_LOGNAME):
     import os, shutil, logging
     from appsexception import FolderCreationError ,FolderDeletionError
     from pathlib import Path
@@ -1169,13 +1198,13 @@ def create_folders(basedir: dict,
             FolderCreationError(full_path)
     return
 
-@parsl.bash_app(executors=['single_partition'])
+@bash_task(executors=['single_partition'])
 def plot_networks(config: BioConfig,
                     inputs=[],
                     outputs=[],
-                    stderr=parsl.AUTO_LOGNAME,
-                    stdout=parsl.AUTO_LOGNAME):
-    import os, logging
+                    stderr=AUTO_LOGNAME,
+                    stdout=AUTO_LOGNAME):
+    import os, logging, shlex
     logging.info("Plotting networks")
     networks = ""
     for basedir in config.workload:
@@ -1193,4 +1222,12 @@ def plot_networks(config: BioConfig,
                 if len(networks) > 0:
                     networks+=','
                 networks+=os.path.join(phylonet_dir, name)
-    return f'julia {config.plot_script} \'{networks}\''
+    julia_command = shlex.quote(config.julia_executable)
+    if config.julia_project:
+        julia_command += f' --project={shlex.quote(config.julia_project)}'
+    if config.julia_depot:
+        julia_command = (
+            f'env JULIA_DEPOT_PATH={shlex.quote(config.julia_depot)} '
+            f'{julia_command}'
+        )
+    return f'{julia_command} {config.plot_script} \'{networks}\''

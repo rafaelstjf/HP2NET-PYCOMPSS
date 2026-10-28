@@ -17,9 +17,6 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 """
 
-from parsl import bash_app, python_app
-import parsl
-
 # COPYRIGHT SECTION
 __author__ = "Diego Carvalho"
 __copyright__ = "Copyright 2021, The Biocomp Informal Collaboration (CEFET/RJ and LNCC)"

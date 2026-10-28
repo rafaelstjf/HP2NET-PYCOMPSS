@@ -1,4 +1,16 @@
-import parsl
+import os
+
+RUNTIME = os.environ.get("HP2NET_RUNTIME", "parsl").lower()
+
+if RUNTIME == "pycompss":
+    from pycompss.api.api import compss_barrier, compss_wait_on
+
+    def wait_for_all(futures):
+        return compss_wait_on(futures)
+else:
+    import parsl
+    from infra_manager import workflow_config, wait_for_all
+
 import apps
 import glob
 import bioconfig
@@ -6,7 +18,6 @@ import os
 import logging
 import argparse
 import math
-from infra_manager import workflow_config, wait_for_all
 from utils import CircularList
 
 reuse = False
@@ -16,25 +27,28 @@ logger = logging.getLogger()
 logging.basicConfig(level=logging.CRITICAL)
 
 
-def raxml_snaq(bio_config, basedir, prepare_to_run):
+def build_raxml_trees(bio_config, basedir, preparation):
     max_workers = bio_config.workflow_core*bio_config.workflow_node
-    result = list()
     ret_tree = list()
-    datalist = list()
     pool = CircularList(math.floor(
         max_workers/int(bio_config.raxml_threads)))
-    # append the input files
     dir_ = os.path.join(os.path.join(basedir['dir'], "input"), "phylip")
-    datalist = glob.glob(os.path.join(dir_, '*.phy'))
-    for i, input_file in enumerate(datalist):
+    for input_file in glob.glob(os.path.join(dir_, '*.phy')):
         ret = apps.raxml(basedir=basedir,
                          config=bio_config,
-                         inputs=prepare_to_run,
+                         inputs=preparation,
                          input_file=input_file, next_pipe=pool.next())
         pool.current(ret)
         ret_tree.append(ret)
-    ret_sad = apps.setup_tree_output(
+    return apps.setup_tree_output(
         basedir=basedir, config=bio_config, inputs=ret_tree)
+
+
+def raxml_snaq(bio_config, basedir, preparation, tree_output=None):
+    max_workers = bio_config.workflow_core*bio_config.workflow_node
+    result = list()
+    ret_sad = (tree_output if tree_output is not None
+               else build_raxml_trees(bio_config, basedir, preparation))
     logging.info("Using the Maximum Pseudo Likelihood Method")
     ret_ast = apps.astral(basedir, config=bio_config, inputs=[ret_sad])
     pool_phylo = CircularList(math.floor(
@@ -47,25 +61,11 @@ def raxml_snaq(bio_config, basedir, prepare_to_run):
     return result
 
 
-def raxml_phylonet(bio_config, basedir, prepare_to_run):
+def raxml_phylonet(bio_config, basedir, preparation, tree_output=None):
     result = list()
-    ret_tree = list()
-    datalist = list()
     max_workers = bio_config.workflow_core*bio_config.workflow_node
-    pool = CircularList(math.floor(
-        max_workers/int(bio_config.raxml_threads)))
-    # append the input files
-    dir_ = os.path.join(os.path.join(basedir['dir'], "input"), "phylip")
-    datalist = glob.glob(os.path.join(dir_, '*.phy'))
-    for i, input_file in enumerate(datalist):
-        ret = apps.raxml(basedir=basedir,
-                         inputs=prepare_to_run,
-                         config=bio_config,
-                         input_file=input_file, next_pipe=pool.next())
-        pool.current(ret)
-        ret_tree.append(ret)
-    ret_sad = apps.setup_tree_output(
-        basedir=basedir, config=bio_config, inputs=ret_tree)
+    ret_sad = (tree_output if tree_output is not None
+               else build_raxml_trees(bio_config, basedir, preparation))
     ret_rooted = apps.root_tree(basedir, config=bio_config, inputs=[ret_sad])
     logging.info("Using the Maximum Parsimony Method")
     out_dir = os.path.join(basedir['dir'], bio_config.phylonet_dir)
@@ -83,24 +83,27 @@ def raxml_phylonet(bio_config, basedir, prepare_to_run):
     return result
 
 
-def iqtree_snaq(bio_config, basedir, prepare_to_run):
+def build_iqtree_trees(bio_config, basedir, preparation):
     max_workers = bio_config.workflow_core*bio_config.workflow_node
-    result = list()
     ret_tree = list()
-    datalist = list()
     pool = CircularList(math.floor(
         max_workers/int(bio_config.iqtree_threads)))
-    # append the input files
     dir_ = os.path.join(os.path.join(basedir['dir'], "input"), "phylip")
-    datalist = glob.glob(os.path.join(dir_, '*.phy'))
-    for input_file in datalist:
+    for input_file in glob.glob(os.path.join(dir_, '*.phy')):
         ret = apps.iqtree(basedir=basedir, config=bio_config,
-                          inputs=prepare_to_run,
+                          inputs=preparation,
                           input_file=input_file, next_pipe=pool.next())
         pool.current(ret)
         ret_tree.append(ret)
-    ret_sad = apps.setup_tree_output(
+    return apps.setup_tree_output(
         basedir=basedir, config=bio_config, inputs=ret_tree)
+
+
+def iqtree_snaq(bio_config, basedir, preparation, tree_output=None):
+    max_workers = bio_config.workflow_core*bio_config.workflow_node
+    result = list()
+    ret_sad = (tree_output if tree_output is not None
+               else build_iqtree_trees(bio_config, basedir, preparation))
     logging.info("Using the Maximum Pseudo Likelihood Method")
     ret_ast = apps.astral(basedir, bio_config, inputs=[ret_sad])
     pool_phylo = CircularList(math.floor(
@@ -113,22 +116,11 @@ def iqtree_snaq(bio_config, basedir, prepare_to_run):
     return result
 
 
-def iqtree_phylonet(bio_config, basedir, prepare_to_run):
+def iqtree_phylonet(bio_config, basedir, preparation, tree_output=None):
     result = list()
-    ret_tree = list()
-    datalist = list()
     max_workers = bio_config.workflow_core*bio_config.workflow_node
-    pool = CircularList(math.floor(max_workers/int(bio_config.iqtree_threads)))
-    # append the input files
-    dir_ = os.path.join(os.path.join(basedir['dir'], "input"), "phylip")
-    datalist = glob.glob(os.path.join(dir_, '*.phy'))
-    for input_file in datalist:
-        ret = apps.iqtree(basedir=basedir, config=bio_config, inputs=prepare_to_run,
-                          input_file=input_file, next_pipe=pool.next())
-        pool.current(ret)
-        ret_tree.append(ret)
-    ret_sad = apps.setup_tree_output(
-        basedir=basedir, config=bio_config, inputs=ret_tree)
+    ret_sad = (tree_output if tree_output is not None
+               else build_iqtree_trees(bio_config, basedir, preparation))
     ret_rooted = apps.root_tree(basedir, bio_config, inputs=[ret_sad])
     logging.info("Using the Maximum Parsimony Method")
     out_dir = os.path.join(basedir['dir'], bio_config.phylonet_dir)
@@ -186,33 +178,51 @@ def mrbayes_snaq(bio_config, basedir, prepare_to_run):
         result.append(ret_snq)
     return result
 
+def _required_folders(config, basedir):
+    """Return the output folders needed by one configured pipeline."""
+    network_method = basedir['network_method']
+    tree_method = basedir['tree_method']
+    if network_method == 'MPL':
+        if tree_method == 'RAXML':
+            return [config.raxml_dir, config.astral_dir, config.snaq_dir]
+        if tree_method == 'IQTREE':
+            return [config.iqtree_dir, config.astral_dir, config.snaq_dir]
+        if tree_method == 'MRBAYES':
+            return [config.mrbayes_dir, config.bucky_dir, config.mbsum_dir,
+                    config.quartet_maxcut_dir, config.snaq_dir]
+    elif network_method == 'MP':
+        if tree_method == 'RAXML':
+            return [config.raxml_dir, config.phylonet_dir]
+        if tree_method == 'IQTREE':
+            return [config.iqtree_dir, config.phylonet_dir]
+    return []
+
+
 def prepare_to_run(config):
-    folder_list = list()
-    r = list()
-    phylip_folders = list()
+    """Prepare each dataset and its union of output folders exactly once."""
+    preparations = list()
+    datasets = dict()
     for basedir in config.workload:
-        if basedir['dir'] not in phylip_folders:
-            r.append(apps.setup_phylip_data(basedir, config))
-            phylip_folders.append(basedir['dir'])
-        network_method = basedir['network_method']
-        tree_method = basedir['tree_method']
-        if (network_method == 'MPL'):
-            if (tree_method == 'RAXML'):
-                folder_list.extend(
-                    [config.raxml_dir, config.astral_dir, config.snaq_dir])
-            elif (tree_method == 'IQTREE'):
-                folder_list.extend(
-                    [config.iqtree_dir, config.astral_dir, config.snaq_dir])
-            elif (tree_method == 'MRBAYES'):
-                folder_list.extend([config.mrbayes_dir, config.bucky_dir,
-                                   config.mbsum_dir, config.quartet_maxcut_dir, config.snaq_dir])
-        elif (network_method == 'MP'):
-            if (tree_method == 'RAXML'):
-                folder_list.extend([config.raxml_dir, config.phylonet_dir])
-            elif (tree_method == 'IQTREE'):
-                folder_list.extend([config.iqtree_dir, config.phylonet_dir])
-        r.append(apps.create_folders(basedir, config, folders=folder_list))
-    return r
+        dataset = datasets.setdefault(
+            basedir['dir'], {'basedir': basedir, 'folders': set()})
+        dataset['folders'].update(_required_folders(config, basedir))
+
+    for dataset in datasets.values():
+        basedir = dataset['basedir']
+        preparations.append(apps.setup_phylip_data(basedir, config))
+        preparations.append(apps.create_folders(
+            basedir, config, folders=sorted(dataset['folders'])))
+    return preparations
+
+
+def group_workloads(workload):
+    """Group branches that can share the same tree-estimation futures."""
+    groups = dict()
+    for basedir in workload:
+        key = (os.path.normpath(basedir['dir']), basedir['tree_method'])
+        group = groups.setdefault(key, dict())
+        group.setdefault(basedir['network_method'], basedir)
+    return groups.values()
 
 
 def main(**kwargs):
@@ -227,49 +237,56 @@ def main(**kwargs):
     else:
         cf = bioconfig.ConfigFactory(config_file)
     bio_config = cf.build_config()
-    dkf_config = workflow_config(bio_config, **kwargs)
     logging.info(f"{hash(bio_config)}")
-    dkf = parsl.load(dkf_config)
+    if RUNTIME == "parsl":
+        dkf_config = workflow_config(bio_config, **kwargs)
+        parsl.load(dkf_config)
     results = list()
     prep = prepare_to_run(bio_config)
-    for basedir in bio_config.workload:
-        r = None
-        network_method = basedir['network_method']
+
+    if RUNTIME == "pycompss":
+        compss_wait_on(prep)
+    for branches in group_workloads(bio_config.workload):
+        basedir = next(iter(branches.values()))
         tree_method = basedir['tree_method']
-        if (network_method == 'MPL'):
-            if (tree_method == 'RAXML'):
-                r = raxml_snaq(bio_config, basedir, prep)
-            elif (tree_method == 'IQTREE'):
-                r = iqtree_snaq(bio_config, basedir, prep)
-            elif (tree_method == 'MRBAYES'):
-                r = mrbayes_snaq(bio_config, basedir, prep)
-            else:
-                logging.error(
-                    f'Invalid parameter combination: {bio_config.network_method} and {bio_config.tree_method}')
-        elif (network_method == 'MP'):
-            if (tree_method == 'RAXML'):
-                r = raxml_phylonet(bio_config, basedir, prep)
-            elif (tree_method == 'IQTREE'):
-                r = iqtree_phylonet(bio_config, basedir, prep)
-            else:
-                logging.error(
-                    f'Invalid parameter combination: {bio_config.network_method} and {bio_config.tree_method}')
+
+        if tree_method == 'RAXML':
+            tree_output = build_raxml_trees(bio_config, basedir, prep)
+            if 'MP' in branches:
+                results.extend(raxml_phylonet(
+                    bio_config, branches['MP'], prep, tree_output))
+            if 'MPL' in branches:
+                results.extend(raxml_snaq(
+                    bio_config, branches['MPL'], prep, tree_output))
+        elif tree_method == 'IQTREE':
+            tree_output = build_iqtree_trees(bio_config, basedir, prep)
+            if 'MP' in branches:
+                results.extend(iqtree_phylonet(
+                    bio_config, branches['MP'], prep, tree_output))
+            if 'MPL' in branches:
+                results.extend(iqtree_snaq(
+                    bio_config, branches['MPL'], prep, tree_output))
+        elif tree_method == 'MRBAYES':
+            if 'MPL' in branches:
+                results.extend(mrbayes_snaq(
+                    bio_config, branches['MPL'], prep))
+            if 'MP' in branches:
+                logging.error('MRBAYES|MP is not a supported workflow')
         else:
-            logging.error(
-                f'Invalid network method: {bio_config.network_method}')
-        if r is not None:
-            results.extend(r)
-            # wait_for_all(r)
+            logging.error(f'Invalid tree method: {tree_method}')
     if bio_config.plot_networks == True:
         plot = apps.plot_networks(bio_config, inputs=results)
         wait_for_all([plot])
     else:
         wait_for_all(results)
-    parsl.dfk().cleanup() 
+    if RUNTIME == "pycompss":
+        compss_barrier()
+    else:
+        parsl.dfk().cleanup()
     return
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description='Process the configuration file.')
     parser.add_argument('-s', '--settings', help='Settings file',
@@ -285,3 +302,7 @@ if __name__ == "__main__":
 
     main(config_file=args.settings, workload_file=args.workload,
          max_workers=args.maxworkers, runinfo=args.runinfo)
+
+
+if __name__ == "__main__":
+    cli()
